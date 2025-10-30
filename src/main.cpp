@@ -1,16 +1,17 @@
 #include <Arduino.h>
 #include <MD_YX5300.h>
 #include <HardwareSerial.h>
+#include <input.h>
 
 #define UART_MP3_PLAYER  2
-#define PIN_RELAIS       4
-// #define PIN_PUPPET       27
-//#define PIN_LED_STRIPE   22
+#define PIN_RELAIS       14
 #define PIN_TRIGGER 21
 
 HardwareSerial  MP3Stream(UART_MP3_PLAYER);  // MP3 player serial stream for comms
 MD_YX5300 mp3(MP3Stream);
 const uint8_t PLAY_FOLDER = 1;   // tracks are all placed in this folder
+
+Input trigger(PIN_TRIGGER, false, true);
 
 // Used to process device responses either as a library callback function
 // or called locally when not in callback mode.
@@ -43,12 +44,40 @@ void cbResponse(const MD_YX5300::cbData *status){
   Serial.print(status->data, HEX);
 }
 
-void trigger_puppet(){
-  digitalWrite(PIN_PUPPET, HIGH);
-  delay(100);
-  digitalWrite(PIN_PUPPET, LOW);
+bool mp3IsPlaying(){
+  /* mp3.queryStatus();
+  mp3.check();
+  const MD_YX5300::cbData *status = mp3.getStatus();
+
+  uint16_t data = status->data;
+
+  uint8_t playState = data & 0xFF;  // Extract the low byte
+  return (playState == 0x01); */
+  return false;
 }
 
+void startSound(){
+  mp3.playTrack(1);
+    
+  // Trigger lightshow
+  digitalWrite(PIN_RELAIS, LOW);
+  delay(300);
+  digitalWrite(PIN_RELAIS, HIGH);
+
+  delay(222*1000); 
+}
+
+void stopSound(){
+  //mp3.playTrack(2);
+  //mp3.playStop();
+    
+  // Trigger lightshow
+  /* digitalWrite(PIN_RELAIS, LOW);
+  delay(300);
+  digitalWrite(PIN_RELAIS, HIGH); */
+
+  //delay(2000); 
+}
 
 void setup(){
   Serial.begin(9600);
@@ -56,34 +85,31 @@ void setup(){
 
   // set the hardware pins
   pinMode(PIN_RELAIS, OUTPUT);
-  //pinMode(PIN_PUPPET, OUTPUT);
-  pinMode(PIN_TRIGGER, INPUT_PULLUP);
-
   digitalWrite(PIN_RELAIS, HIGH);
-  //digitalWrite(PIN_PUPPET, LOW);
 
-  // initialize global libraries
+  // initialize mp3 player
   MP3Stream.begin(MD_YX5300::SERIAL_BPS);
   mp3.begin();
   mp3.setSynchronous(true);
-  mp3.playFolderRepeat(PLAY_FOLDER);
+  //mp3.playFolderRepeat(PLAY_FOLDER);
   mp3.volume(mp3.volumeMax());
+
+  //mp3.playStop();
+
+  trigger.limitRate(5);
+  trigger.setDebounceTime(200);
+  trigger.setLongpressTime(1000);
+  //trigger.setActivationHandler(startSound);
+  trigger.setLongpressHandler(startSound);
 }
 
 void loop(){
   // call in each loop iteration to poll mp3 status
-  /* if(mp3.check()){        
+  if(mp3.check()){        
     cbResponse(mp3.getStatus());
-  } */
-
-  // when the lightbarrier is triggered
-  if(!digitalRead(PIN_TRIGGER)){
-
-    trigger_puppet(); // start puppet
-
-    delay(10000); // wait 500 ms
-
   }
 
-  delay(50);
+  trigger.poll();
+
+  delay(10);
 }
